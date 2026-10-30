@@ -231,12 +231,17 @@ if modulo == "📡 Scanner RFID (In/Out)":
     tab_libera, tab_rientro = st.tabs(["💥 Scansione Libera (Uscite/Misti)", "🎯 Checklist Rientro Cantiere"])
     
     with tab_libera:
-        st.info("💡 **Istruzioni:** Clicca nel riquadro, tieni premuto il grilletto della Zebra per leggere tutti i tag dell'area. Quando hai finito, **clicca fuori dal riquadro**.")
+        st.info("💡 **Istruzioni:** Tieni premuto il grilletto per sparare i codici. Finito di sparare, premi il pulsante **'🔄 Elabora Codici'**.")
         
         testo_scansioni = st.text_area("Tag Scansionati (Modalità Libera):", height=150, placeholder="Spara i codici a raffica qui...", key="txt_libera")
+        components.html("""<script>var i=window.parent.document.querySelector("textarea[aria-label='Tag Scansionati (Modalità Libera):']"); if(i)i.focus();</script>""", height=0)
+        
+        # Aggiunto pulsante esplicito per forzare l'elaborazione su tablet
+        st.button("🔄 Elabora Codici Letti", type="primary", use_container_width=True, key="btn_elabora_libera")
         
         if testo_scansioni:
-            codici_letti = list(set([str(c).strip().upper() for c in testo_scansioni.split('\n') if str(c).strip()]))
+            # Pulizia aggressiva da eventuali carriage return invisibili (\r) della pistola
+            codici_letti = list(set([str(c).replace('\r', '').strip().upper() for c in testo_scansioni.split('\n') if str(c).strip()]))
             
             if codici_letti:
                 trovati_idx = set()
@@ -245,7 +250,7 @@ if modulo == "📡 Scanner RFID (In/Out)":
                 for code in codici_letti:
                     match_found = False
                     for idx, row in df_magazzino.iterrows():
-                        db_code = str(row['CODICE RFID']).strip().upper()
+                        db_code = str(row['CODICE RFID']).replace('\r', '').strip().upper()
                         if db_code and (db_code in code or code in db_code):
                             trovati_idx.add(idx)
                             match_found = True
@@ -342,9 +347,12 @@ if modulo == "📡 Scanner RFID (In/Out)":
                 st.write(f"In questo cantiere risultano assegnati **{len(df_attesi)}** strumenti.")
                 
                 testo_rientro = st.text_area("2️⃣ Spara i tag della cassa in rientro:", height=150, placeholder="Spara i codici qui...", key="txt_rientro")
+                components.html("""<script>var i=window.parent.document.querySelector("textarea[aria-label='2️⃣ Spara i tag della cassa in rientro:']"); if(i)i.focus();</script>""", height=0)
+                
+                st.button("🔄 Verifica Rientro", type="primary", use_container_width=True, key="btn_verifica_rientro")
                 
                 if testo_rientro:
-                    codici_letti = list(set([str(c).strip().upper() for c in testo_rientro.split('\n') if str(c).strip()]))
+                    codici_letti = list(set([str(c).replace('\r', '').strip().upper() for c in testo_rientro.split('\n') if str(c).strip()]))
                     
                     trovati_idx = set()
                     intrusi = []
@@ -352,7 +360,7 @@ if modulo == "📡 Scanner RFID (In/Out)":
                     for code in codici_letti:
                         match_found = False
                         for idx, row in df_magazzino.iterrows():
-                            db_code = str(row['CODICE RFID']).strip().upper()
+                            db_code = str(row['CODICE RFID']).replace('\r', '').strip().upper()
                             if db_code and (db_code in code or code in db_code):
                                 match_found = True
                                 if row['Assegnatario / Cantiere'] == cantiere_scelto:
@@ -388,7 +396,7 @@ if modulo == "📡 Scanner RFID (In/Out)":
                             df_pronti[['Seleziona', 'STRUMENTAZIONE', 'MODELLO/TIPOLOGIA']],
                             column_config={"Seleziona": st.column_config.CheckboxColumn("Conferma", default=True)},
                             disabled=['STRUMENTAZIONE', 'MODELLO/TIPOLOGIA'],
-                            hide_index=True, use_container_width=True, key="edit_rientro"
+                            hide_index=True, use_container_width=True, key="edit_rientro_final"
                         )
                         idx_confermati = df_edit_rientro[df_edit_rientro['Seleziona'] == True].index
                         
@@ -404,7 +412,6 @@ if modulo == "📡 Scanner RFID (In/Out)":
                             st.cache_data.clear()
                             time.sleep(1.5)
                             st.rerun()
-
 
 elif modulo == "📝 Uscita/Rientro Manuale":
     st.markdown("### 📝 Selezione Multipla per Reparto")
