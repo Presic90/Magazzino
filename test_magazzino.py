@@ -316,18 +316,39 @@ elif modulo == "📊 Situazione Attuale":
     st.dataframe(df_v[['Stato', 'STRUMENTAZIONE', 'MODELLO/TIPOLOGIA', 'Assegnatario / Cantiere']], use_container_width=True, hide_index=True)
 
 elif modulo == "🏗️ Cantieri e Bolle":
-    st.markdown("### 🏗️ Distinte")
+    st.markdown("### 🏗️ Gestione Distinte")
     df_st = carica_storico()
     cantieri = sorted([str(c) for c in df_st['Cantiere / Assegnatario'].unique() if str(c).strip() != ""])
+    
     if cantieri:
         cant = st.selectbox("Scegli Cantiere:", ["-- Seleziona --"] + cantieri)
         if cant != "-- Seleziona --":
             tipo = st.radio("Fase:", ["🔴 Uscita", "🟢 Rientro"], horizontal=True)
             filtro = "USCITA" if "Uscita" in tipo else "RIENTRO"
-            df_kit = df_st[(df_st['Cantiere / Assegnatario'] == cant) & (df_st['Operazione'].str.contains(filtro))].drop_duplicates(subset=['CODICE RFID'])
-            st.dataframe(df_kit[['Strumento', 'Data']], use_container_width=True, hide_index=True)
+            
+            maschera = (df_st['Cantiere / Assegnatario'] == cant) & (df_st['Operazione'].str.contains(filtro))
+            df_kit = df_st[maschera].drop_duplicates(subset=['CODICE RFID'])
+            
             if not df_kit.empty:
-                st.download_button("🖨️ Stampa", data=genera_bolla_html(cant, df_kit, filtro), file_name=f"Bolla_{cant}.html", mime="text/html", type="primary")
+                st.markdown("Modifica la bolla (puoi cancellare righe con l'icona cestino prima di stampare):")
+                df_kit_edit = st.data_editor(
+                    df_kit[['CODICE RFID', 'Strumento', 'Modello', 'Data']], 
+                    use_container_width=True, hide_index=True, num_rows="dynamic"
+                )
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.download_button("🖨️ Stampa Bolla", data=genera_bolla_html(cant, df_kit_edit, filtro), file_name=f"Bolla_{cant}.html", mime="text/html", type="primary")
+                with col2:
+                    if st.button("🗑️ Elimina intera Bolla dallo Storico", type="secondary"):
+                        df_st_pulito = df_st[~maschera]
+                        with pd.ExcelWriter(FILE_STORICO, engine="openpyxl", mode="w") as w:
+                            df_st_pulito.to_excel(w, index=False)
+                        st.success("✅ Bolla eliminata definitivamente!")
+                        time.sleep(1)
+                        st.rerun()
+            else:
+                st.info("Nessuna movimentazione trovata per questa selezione.")
 
 elif modulo == "📜 Storico Movimenti":
     st.markdown("### 📜 Movimentazioni (Cancella Riga o Modifica)")
