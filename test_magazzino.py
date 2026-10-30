@@ -233,15 +233,30 @@ if modulo == "📡 Scanner RFID (In/Out)":
     components.html("""<script>var i=window.parent.document.querySelector("textarea[aria-label='Tag Scansionati:']"); if(i)i.focus();</script>""", height=0)
     
     if testo_scansioni:
-        codici_letti = list(set([str(c).strip() for c in testo_scansioni.split('\n') if str(c).strip()]))
+        # Pulisce i codici scansionati mettendoli tutti in maiuscolo
+        codici_letti = list(set([str(c).strip().upper() for c in testo_scansioni.split('\n') if str(c).strip()]))
         
         if codici_letti:
-            df_magazzino['Codice_Pulito'] = df_magazzino['CODICE RFID'].astype(str).str.strip()
-            df_trovati = df_magazzino[df_magazzino['Codice_Pulito'].isin(codici_letti)].copy()
+            trovati_idx = set()
+            non_trovati = []
             
-            codici_non_trovati = set(codici_letti) - set(df_trovati['Codice_Pulito'].tolist())
-            if codici_non_trovati:
-                st.warning(f"⚠️ {len(codici_non_trovati)} tag letti non sono registrati nel gestionale.")
+            # Ricerca super-flessibile (replica il vecchio sistema a singolo colpo)
+            for code in codici_letti:
+                match_found = False
+                for idx, row in df_magazzino.iterrows():
+                    db_code = str(row['CODICE RFID']).strip().upper()
+                    # Se trova una corrispondenza (anche parziale) si aggancia
+                    if db_code and (db_code in code or code in db_code):
+                        trovati_idx.add(idx)
+                        match_found = True
+                        
+                if not match_found:
+                    non_trovati.append(code)
+            
+            df_trovati = df_magazzino.loc[list(trovati_idx)].copy()
+            
+            if non_trovati:
+                st.warning(f"⚠️ {len(non_trovati)} tag non in archivio: {', '.join(non_trovati)}")
             
             if not df_trovati.empty:
                 st.write(f"🔍 Trovati **{len(df_trovati)}** strumenti validi. Deseleziona eventuali errori:")
