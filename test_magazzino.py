@@ -227,107 +227,184 @@ st.divider()
 
 if modulo == "📡 Scanner RFID (In/Out)":
     st.markdown("### 📡 Scansione di Massa (RFID)")
-    st.info("💡 **Istruzioni:** Clicca nel riquadro, tieni premuto il grilletto della Zebra per leggere tutti i tag dell'area. Quando hai finito, **clicca fuori dal riquadro**.")
     
-    testo_scansioni = st.text_area("Tag Scansionati:", height=150, placeholder="Spara i codici a raffica qui...")
-    components.html("""<script>var i=window.parent.document.querySelector("textarea[aria-label='Tag Scansionati:']"); if(i)i.focus();</script>""", height=0)
+    tab_libera, tab_rientro = st.tabs(["💥 Scansione Libera (Uscite/Misti)", "🎯 Checklist Rientro Cantiere"])
     
-    if testo_scansioni:
-        # Pulisce i codici scansionati mettendoli tutti in maiuscolo
-        codici_letti = list(set([str(c).strip().upper() for c in testo_scansioni.split('\n') if str(c).strip()]))
+    with tab_libera:
+        st.info("💡 **Istruzioni:** Clicca nel riquadro, tieni premuto il grilletto della Zebra per leggere tutti i tag dell'area. Quando hai finito, **clicca fuori dal riquadro**.")
         
-        if codici_letti:
-            trovati_idx = set()
-            non_trovati = []
+        testo_scansioni = st.text_area("Tag Scansionati (Modalità Libera):", height=150, placeholder="Spara i codici a raffica qui...", key="txt_libera")
+        
+        if testo_scansioni:
+            codici_letti = list(set([str(c).strip().upper() for c in testo_scansioni.split('\n') if str(c).strip()]))
             
-            # Ricerca super-flessibile (replica il vecchio sistema a singolo colpo)
-            for code in codici_letti:
-                match_found = False
-                for idx, row in df_magazzino.iterrows():
-                    db_code = str(row['CODICE RFID']).strip().upper()
-                    # Se trova una corrispondenza (anche parziale) si aggancia
-                    if db_code and (db_code in code or code in db_code):
-                        trovati_idx.add(idx)
-                        match_found = True
-                        
-                if not match_found:
-                    non_trovati.append(code)
-            
-            df_trovati = df_magazzino.loc[list(trovati_idx)].copy()
-            
-            if non_trovati:
-                st.warning(f"⚠️ {len(non_trovati)} tag non in archivio: {', '.join(non_trovati)}")
-            
-            if not df_trovati.empty:
-                st.write(f"🔍 Trovati **{len(df_trovati)}** strumenti validi. Deseleziona eventuali errori:")
+            if codici_letti:
+                trovati_idx = set()
+                non_trovati = []
                 
-                df_trovati.insert(0, 'Seleziona', True)
-                df_editato = st.data_editor(
-                    df_trovati[['Seleziona', 'Stato', 'STRUMENTAZIONE', 'MODELLO/TIPOLOGIA', 'Assegnatario / Cantiere']],
-                    column_config={"Seleziona": st.column_config.CheckboxColumn("Conferma", default=True)},
-                    disabled=['Stato', 'STRUMENTAZIONE', 'MODELLO/TIPOLOGIA', 'Assegnatario / Cantiere'],
-                    hide_index=True, use_container_width=True
-                )
+                for code in codici_letti:
+                    match_found = False
+                    for idx, row in df_magazzino.iterrows():
+                        db_code = str(row['CODICE RFID']).strip().upper()
+                        if db_code and (db_code in code or code in db_code):
+                            trovati_idx.add(idx)
+                            match_found = True
+                    if not match_found:
+                        non_trovati.append(code)
                 
-                idx_selezionati = df_editato[df_editato['Seleziona'] == True].index
+                df_trovati = df_magazzino.loc[list(trovati_idx)].copy()
                 
-                in_sede = df_trovati.loc[idx_selezionati][df_trovati.loc[idx_selezionati, 'Stato'] == "🟢 In Sede"]
-                fuori = df_trovati.loc[idx_selezionati][df_trovati.loc[idx_selezionati, 'Stato'] != "🟢 In Sede"]
+                if non_trovati:
+                    st.warning(f"⚠️ {len(non_trovati)} tag non in archivio: {', '.join(non_trovati)}")
                 
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    st.markdown(f"#### 🔴 Invia in Cantiere ({len(in_sede)})")
-                    if not in_sede.empty:
-                        scaduti = []
-                        for idx in in_sede.index:
-                            if verifica_taratura_iso(in_sede.loc[idx, 'MATRICOLA']) == "SCADUTO":
-                                scaduti.append(in_sede.loc[idx, 'STRUMENTAZIONE'])
-                        if scaduti:
-                            st.error(f"⚠️ Taratura SCADUTA per: {', '.join(scaduti)}")
-                        
-                        assegnatario = st.text_input("Assegna tutti a:", value=st.session_state['ultimo_cantiere'])
-                        bottone_testo = "⚠️ FORZA USCITA GRUPPO" if scaduti else "🔴 Registra USCITA di massa"
-                        bottone_tipo = "secondary" if scaduti else "primary"
-                        
-                        if st.button(bottone_testo, type=bottone_tipo, key="btn_out_mass"):
-                            if assegnatario:
-                                st.session_state['ultimo_cantiere'] = assegnatario
-                                for idx in in_sede.index:
+                if not df_trovati.empty:
+                    st.write(f"🔍 Trovati **{len(df_trovati)}** strumenti validi. Deseleziona eventuali errori:")
+                    
+                    df_trovati.insert(0, 'Seleziona', True)
+                    df_editato = st.data_editor(
+                        df_trovati[['Seleziona', 'Stato', 'STRUMENTAZIONE', 'MODELLO/TIPOLOGIA', 'Assegnatario / Cantiere']],
+                        column_config={"Seleziona": st.column_config.CheckboxColumn("Conferma", default=True)},
+                        disabled=['Stato', 'STRUMENTAZIONE', 'MODELLO/TIPOLOGIA', 'Assegnatario / Cantiere'],
+                        hide_index=True, use_container_width=True
+                    )
+                    
+                    idx_selezionati = df_editato[df_editato['Seleziona'] == True].index
+                    
+                    in_sede = df_trovati.loc[idx_selezionati][df_trovati.loc[idx_selezionati, 'Stato'] == "🟢 In Sede"]
+                    fuori = df_trovati.loc[idx_selezionati][df_trovati.loc[idx_selezionati, 'Stato'] != "🟢 In Sede"]
+                    
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        st.markdown(f"#### 🔴 Invia in Cantiere ({len(in_sede)})")
+                        if not in_sede.empty:
+                            scaduti = []
+                            for idx in in_sede.index:
+                                if verifica_taratura_iso(in_sede.loc[idx, 'MATRICOLA']) == "SCADUTO":
+                                    scaduti.append(in_sede.loc[idx, 'STRUMENTAZIONE'])
+                            if scaduti:
+                                st.error(f"⚠️ Taratura SCADUTA per: {', '.join(scaduti)}")
+                            
+                            assegnatario = st.text_input("Assegna tutti a:", value=st.session_state['ultimo_cantiere'])
+                            bottone_testo = "⚠️ FORZA USCITA GRUPPO" if scaduti else "🔴 Registra USCITA di massa"
+                            bottone_tipo = "secondary" if scaduti else "primary"
+                            
+                            if st.button(bottone_testo, type=bottone_tipo, key="btn_out_mass"):
+                                if assegnatario:
+                                    st.session_state['ultimo_cantiere'] = assegnatario
+                                    for idx in in_sede.index:
+                                        strumento = df_magazzino.loc[idx]
+                                        df_magazzino.at[idx, 'Stato'] = "🔴 In Cantiere"
+                                        df_magazzino.at[idx, 'Assegnatario / Cantiere'] = assegnatario
+                                        df_magazzino.at[idx, 'Ultima Modifica'] = datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
+                                        nota = "🔴 USCITA (FORZATA)" if strumento['STRUMENTAZIONE'] in scaduti else "🔴 USCITA"
+                                        salva_in_storico(strumento['CODICE RFID'], strumento['STRUMENTAZIONE'], strumento['MODELLO/TIPOLOGIA'], nota, assegnatario)
+                                    salva_live(df_magazzino)
+                                    st.success(f"✅ {len(in_sede)} strumenti registrati in uscita!")
+                                    st.cache_data.clear()
+                                    time.sleep(1.5)
+                                    st.rerun()
+                                else:
+                                    st.warning("Inserisci il cantiere di destinazione!")
+                        else:
+                            st.info("Nessuno strumento selezionato per l'uscita.")
+                            
+                    with col2:
+                        st.markdown(f"#### 🟢 Fai Rientrare ({len(fuori)})")
+                        if not fuori.empty:
+                            if st.button("🟢 Registra RIENTRO di massa", type="primary", key="btn_in_mass"):
+                                for idx in fuori.index:
                                     strumento = df_magazzino.loc[idx]
-                                    df_magazzino.at[idx, 'Stato'] = "🔴 In Cantiere"
-                                    df_magazzino.at[idx, 'Assegnatario / Cantiere'] = assegnatario
+                                    vecchio_ass = strumento['Assegnatario / Cantiere']
+                                    df_magazzino.at[idx, 'Stato'] = "🟢 In Sede"
+                                    df_magazzino.at[idx, 'Assegnatario / Cantiere'] = ""
                                     df_magazzino.at[idx, 'Ultima Modifica'] = datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
-                                    nota = "🔴 USCITA (FORZATA)" if strumento['STRUMENTAZIONE'] in scaduti else "🔴 USCITA"
-                                    salva_in_storico(strumento['CODICE RFID'], strumento['STRUMENTAZIONE'], strumento['MODELLO/TIPOLOGIA'], nota, assegnatario)
+                                    salva_in_storico(strumento['CODICE RFID'], strumento['STRUMENTAZIONE'], strumento['MODELLO/TIPOLOGIA'], "🟢 RIENTRO", vecchio_ass)
                                 salva_live(df_magazzino)
-                                st.success(f"✅ {len(in_sede)} strumenti registrati in uscita!")
+                                st.success(f"✅ {len(fuori)} strumenti rientrati in sede!")
                                 st.cache_data.clear()
                                 time.sleep(1.5)
                                 st.rerun()
-                            else:
-                                st.warning("Inserisci il cantiere di destinazione!")
-                    else:
-                        st.info("Nessuno strumento selezionato per l'uscita.")
+                        else:
+                            st.info("Nessuno strumento selezionato per il rientro.")
+
+    with tab_rientro:
+        st.markdown("#### Verifica e Spunta Rientri per Cantiere")
+        cantieri_attivi = sorted([str(c) for c in df_magazzino['Assegnatario / Cantiere'].unique() if str(c).strip() != ""])
+        
+        if not cantieri_attivi:
+            st.success("🎉 Nessun cantiere aperto! Tutti gli strumenti risultano in Sede.")
+        else:
+            cantiere_scelto = st.selectbox("1️⃣ Seleziona il cantiere in rientro:", ["-- Seleziona --"] + cantieri_attivi)
+            
+            if cantiere_scelto != "-- Seleziona --":
+                df_attesi = df_magazzino[df_magazzino['Assegnatario / Cantiere'] == cantiere_scelto].copy()
+                st.write(f"In questo cantiere risultano assegnati **{len(df_attesi)}** strumenti.")
+                
+                testo_rientro = st.text_area("2️⃣ Spara i tag della cassa in rientro:", height=150, placeholder="Spara i codici qui...", key="txt_rientro")
+                
+                if testo_rientro:
+                    codici_letti = list(set([str(c).strip().upper() for c in testo_rientro.split('\n') if str(c).strip()]))
+                    
+                    trovati_idx = set()
+                    intrusi = []
+                    
+                    for code in codici_letti:
+                        match_found = False
+                        for idx, row in df_magazzino.iterrows():
+                            db_code = str(row['CODICE RFID']).strip().upper()
+                            if db_code and (db_code in code or code in db_code):
+                                match_found = True
+                                if row['Assegnatario / Cantiere'] == cantiere_scelto:
+                                    trovati_idx.add(idx)
+                                else:
+                                    posizione = row['Assegnatario / Cantiere'] if str(row['Assegnatario / Cantiere']).strip() else 'IN SEDE'
+                                    intrusi.append(f"{row['STRUMENTAZIONE']} (Assegnato a: {posizione})")
+                    
+                    mancanti_idx = set(df_attesi.index) - trovati_idx
+                    
+                    df_pronti = df_magazzino.loc[list(trovati_idx)].copy()
+                    df_mancanti = df_magazzino.loc[list(mancanti_idx)].copy()
+                    
+                    col_m1, col_m2, col_m3 = st.columns(3)
+                    col_m1.metric("📦 Totale Attesi", len(df_attesi))
+                    col_m2.metric("✅ Pronti al Rientro", len(df_pronti))
+                    col_m3.metric("❌ Mancanti all'appello", len(df_mancanti))
+                    
+                    if intrusi:
+                        st.warning(f"⚠️ Rilevati {len(intrusi)} strumenti non appartenenti a questo cantiere: {', '.join(intrusi)}")
+                    
+                    if not df_mancanti.empty:
+                        st.error(f"⚠️ Mancano {len(df_mancanti)} strumenti per chiudere la bolla del cantiere!")
+                        st.dataframe(df_mancanti[['STRUMENTAZIONE', 'MODELLO/TIPOLOGIA']], use_container_width=True, hide_index=True)
+                    elif len(df_pronti) > 0:
+                        st.success("🎉 PERFETTO! Tutti gli strumenti del cantiere sono stati scansionati!")
+                        st.balloons()
                         
-                with col2:
-                    st.markdown(f"#### 🟢 Fai Rientrare ({len(fuori)})")
-                    if not fuori.empty:
-                        if st.button("🟢 Registra RIENTRO di massa", type="primary", key="btn_in_mass"):
-                            for idx in fuori.index:
+                    if not df_pronti.empty:
+                        st.markdown("##### Strumenti pronti al rientro")
+                        df_pronti.insert(0, 'Seleziona', True)
+                        df_edit_rientro = st.data_editor(
+                            df_pronti[['Seleziona', 'STRUMENTAZIONE', 'MODELLO/TIPOLOGIA']],
+                            column_config={"Seleziona": st.column_config.CheckboxColumn("Conferma", default=True)},
+                            disabled=['STRUMENTAZIONE', 'MODELLO/TIPOLOGIA'],
+                            hide_index=True, use_container_width=True, key="edit_rientro"
+                        )
+                        idx_confermati = df_edit_rientro[df_edit_rientro['Seleziona'] == True].index
+                        
+                        if st.button(f"🟢 Registra RIENTRO ({len(idx_confermati)} strumenti)", type="primary"):
+                            for idx in idx_confermati:
                                 strumento = df_magazzino.loc[idx]
-                                vecchio_ass = strumento['Assegnatario / Cantiere']
                                 df_magazzino.at[idx, 'Stato'] = "🟢 In Sede"
                                 df_magazzino.at[idx, 'Assegnatario / Cantiere'] = ""
                                 df_magazzino.at[idx, 'Ultima Modifica'] = datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
-                                salva_in_storico(strumento['CODICE RFID'], strumento['STRUMENTAZIONE'], strumento['MODELLO/TIPOLOGIA'], "🟢 RIENTRO", vecchio_ass)
+                                salva_in_storico(strumento['CODICE RFID'], strumento['STRUMENTAZIONE'], strumento['MODELLO/TIPOLOGIA'], "🟢 RIENTRO", cantiere_scelto)
                             salva_live(df_magazzino)
-                            st.success(f"✅ {len(fuori)} strumenti rientrati in sede!")
+                            st.success("✅ Rientro registrato con successo!")
                             st.cache_data.clear()
                             time.sleep(1.5)
                             st.rerun()
-                    else:
-                        st.info("Nessuno strumento selezionato per il rientro.")
+
 
 elif modulo == "📝 Uscita/Rientro Manuale":
     st.markdown("### 📝 Selezione Multipla per Reparto")
