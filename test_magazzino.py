@@ -8,10 +8,43 @@ import base64
 
 st.set_page_config(page_title="Test Magazzino RFID", page_icon="📦", layout="wide")
 
+# --- STILE CSS OTTIMIZZATO PER SMARTPHONE ---
+st.markdown("""
+<style>
+    /* Nasconde header, footer e menu predefiniti di Streamlit per un look da app nativa */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    
+    /* Ingrandisce e stonda i bottoni (Finger-friendly) */
+    .stButton>button {
+        width: 100%;
+        height: 65px !important;
+        border-radius: 12px !important;
+        font-size: 18px !important;
+        font-weight: bold !important;
+    }
+    
+    /* Aumenta lo spazio di tocco nel campo di input dello scanner */
+    .stTextInput>div>div>input {
+        font-size: 16px !important;
+        padding: 14px !important;
+        border-radius: 8px !important;
+    }
+    
+    /* Ottimizza i margini laterali per schermi piccoli */
+    .block-container {
+        padding-top: 2rem;
+        padding-left: 1rem;
+        padding-right: 1rem;
+        padding-bottom: 2rem;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 FILE_CATALOGO = "MagazzinoUfficiale2026(categorie).xlsx"
 FILE_LIVE = "Magazzino_Live.xlsx"
 FILE_STORICO = "Storico_Movimenti.xlsx"
-# IL PERCORSO CORRETTO: Cerca il file dentro la cartella Registro_ISO
 FILE_ISO = "Registro_ISO/Registro_Strumenti_Finale_2.xlsx" 
 NOME_LOGO = "logo.png"
 
@@ -74,14 +107,10 @@ def verifica_taratura_iso(matricola):
         return "MATRICOLA_MANCANTE"
     
     try:
-        # Leggiamo il file permettendo a Pandas di riconoscere le date native
         df_iso = pd.read_excel(FILE_ISO)
-        
-        # Rendiamo i nomi delle colonne tutti MAIUSCOLI e senza spazi laterali
         df_iso.columns = df_iso.columns.str.strip().str.upper()
         
         if 'MATRICOLA' in df_iso.columns and 'SCADENZA' in df_iso.columns:
-            # Puliamo la colonna Matricola da eventuali spazi o minuscole
             df_iso['MATRICOLA_CLEAN'] = df_iso['MATRICOLA'].astype(str).str.strip().str.upper()
             mat_cercata = str(matricola).strip().upper()
             
@@ -90,7 +119,6 @@ def verifica_taratura_iso(matricola):
             if not strumento_iso.empty:
                 scadenza_val = strumento_iso.iloc[0]['SCADENZA']
                 if pd.notnull(scadenza_val) and str(scadenza_val).strip() != "":
-                    # Convertiamo in data capendo sia le date testuali (es 15/05) sia quelle di excel
                     scadenza_data = pd.to_datetime(scadenza_val, errors='coerce', dayfirst=True)
                     if pd.notnull(scadenza_data):
                         if scadenza_data < datetime.datetime.now():
