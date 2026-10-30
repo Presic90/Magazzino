@@ -241,7 +241,7 @@ if modulo == "📡 Scanner RFID (In/Out)":
                         st.rerun()
 
 elif modulo == "📝 Uscita/Rientro Manuale":
-    st.markdown("### 📝 Selezione Multipla")
+    st.markdown("### 📝 Selezione Multipla per Reparto")
     operazione = st.radio("Seleziona operazione:", ["🔴 Uscita verso Cantiere", "🟢 Rientro in Sede"], horizontal=True)
     
     if "Uscita" in operazione:
@@ -249,51 +249,76 @@ elif modulo == "📝 Uscita/Rientro Manuale":
         if disponibili.empty:
             st.info("Nessuno strumento in sede.")
         else:
-            disponibili.insert(0, 'Seleziona', False)
-            st.markdown("Spunta gli strumenti da far uscire:")
-            df_editato = st.data_editor(
-                disponibili[['Seleziona', 'STRUMENTAZIONE', 'MODELLO/TIPOLOGIA', 'MATRICOLA']],
-                column_config={"Seleziona": st.column_config.CheckboxColumn("Seleziona", default=False)},
-                disabled=['STRUMENTAZIONE', 'MODELLO/TIPOLOGIA', 'MATRICOLA'],
-                hide_index=True, use_container_width=True
-            )
+            categorie = sorted([c for c in disponibili['Categoria_Foglio'].unique() if str(c).strip() != "nan" and str(c).strip() != ""])
+            if not categorie: categorie = ["Generale"]
+            
+            tabs = st.tabs([str(c).upper() for c in categorie])
+            tutti_selezionati = []
+            
+            for i, cat in enumerate(categorie):
+                with tabs[i]:
+                    df_cat = disponibili[disponibili['Categoria_Foglio'] == cat].copy()
+                    df_cat.insert(0, 'Seleziona', False)
+                    df_editato = st.data_editor(
+                        df_cat[['Seleziona', 'STRUMENTAZIONE', 'MODELLO/TIPOLOGIA', 'MATRICOLA']],
+                        column_config={"Seleziona": st.column_config.CheckboxColumn("Spunta", default=False)},
+                        disabled=['STRUMENTAZIONE', 'MODELLO/TIPOLOGIA', 'MATRICOLA'],
+                        hide_index=True, use_container_width=True, key=f"uscita_{cat}"
+                    )
+                    selezionati_cat = df_editato[df_editato['Seleziona'] == True]
+                    if not selezionati_cat.empty:
+                        tutti_selezionati.append(selezionati_cat)
+
+            st.divider()
             assegnatario = st.text_input("Assegna a Cantiere/Persona:", value=st.session_state['ultimo_cantiere'])
             
             if st.button("🔴 Registra Uscita Selezionati", type="primary"):
-                selezionati = df_editato[df_editato['Seleziona'] == True]
-                if not selezionati.empty and assegnatario:
+                if tutti_selezionati and assegnatario:
                     st.session_state['ultimo_cantiere'] = assegnatario
-                    for idx in selezionati.index:
+                    df_selezionati_completo = pd.concat(tutti_selezionati)
+                    for idx in df_selezionati_completo.index:
                         strumento = df_magazzino.loc[idx]
                         df_magazzino.at[idx, 'Stato'] = "🔴 In Cantiere"
                         df_magazzino.at[idx, 'Assegnatario / Cantiere'] = assegnatario
                         df_magazzino.at[idx, 'Ultima Modifica'] = datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
                         salva_in_storico(strumento['CODICE RFID'], strumento['STRUMENTAZIONE'], strumento['MODELLO/TIPOLOGIA'], "🔴 USCITA (MANUALE)", assegnatario)
                     salva_live(df_magazzino)
-                    st.success(f"✅ {len(selezionati)} strumenti in uscita verso {assegnatario}!")
+                    st.success(f"✅ {len(df_selezionati_completo)} strumenti in uscita verso {assegnatario}!")
                     st.cache_data.clear()
                     time.sleep(1)
                     st.rerun()
                 else:
-                    st.warning("Seleziona gli strumenti e inserisci il cantiere.")
+                    st.warning("Spunta almeno uno strumento e inserisci il cantiere.")
     else:
         fuori = df_magazzino[df_magazzino['Stato'] != "🟢 In Sede"].copy()
         if fuori.empty:
             st.info("Nessuno strumento fuori sede.")
         else:
-            fuori.insert(0, 'Seleziona', False)
-            st.markdown("Spunta gli strumenti da far rientrare:")
-            df_editato = st.data_editor(
-                fuori[['Seleziona', 'STRUMENTAZIONE', 'MODELLO/TIPOLOGIA', 'Assegnatario / Cantiere']],
-                column_config={"Seleziona": st.column_config.CheckboxColumn("Seleziona", default=False)},
-                disabled=['STRUMENTAZIONE', 'MODELLO/TIPOLOGIA', 'Assegnatario / Cantiere'],
-                hide_index=True, use_container_width=True
-            )
+            categorie = sorted([c for c in fuori['Categoria_Foglio'].unique() if str(c).strip() != "nan" and str(c).strip() != ""])
+            if not categorie: categorie = ["Generale"]
             
+            tabs = st.tabs([str(c).upper() for c in categorie])
+            tutti_selezionati = []
+            
+            for i, cat in enumerate(categorie):
+                with tabs[i]:
+                    df_cat = fuori[fuori['Categoria_Foglio'] == cat].copy()
+                    df_cat.insert(0, 'Seleziona', False)
+                    df_editato = st.data_editor(
+                        df_cat[['Seleziona', 'STRUMENTAZIONE', 'MODELLO/TIPOLOGIA', 'Assegnatario / Cantiere']],
+                        column_config={"Seleziona": st.column_config.CheckboxColumn("Spunta", default=False)},
+                        disabled=['STRUMENTAZIONE', 'MODELLO/TIPOLOGIA', 'Assegnatario / Cantiere'],
+                        hide_index=True, use_container_width=True, key=f"rientro_{cat}"
+                    )
+                    selezionati_cat = df_editato[df_editato['Seleziona'] == True]
+                    if not selezionati_cat.empty:
+                        tutti_selezionati.append(selezionati_cat)
+            
+            st.divider()
             if st.button("🟢 Registra Rientro Selezionati", type="primary"):
-                selezionati = df_editato[df_editato['Seleziona'] == True]
-                if not selezionati.empty:
-                    for idx in selezionati.index:
+                if tutti_selezionati:
+                    df_selezionati_completo = pd.concat(tutti_selezionati)
+                    for idx in df_selezionati_completo.index:
                         strumento = df_magazzino.loc[idx]
                         vecchio_cantiere = strumento['Assegnatario / Cantiere']
                         df_magazzino.at[idx, 'Stato'] = "🟢 In Sede"
@@ -301,12 +326,12 @@ elif modulo == "📝 Uscita/Rientro Manuale":
                         df_magazzino.at[idx, 'Ultima Modifica'] = datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
                         salva_in_storico(strumento['CODICE RFID'], strumento['STRUMENTAZIONE'], strumento['MODELLO/TIPOLOGIA'], "🟢 RIENTRO (MANUALE)", vecchio_cantiere)
                     salva_live(df_magazzino)
-                    st.success(f"✅ {len(selezionati)} strumenti rientrati!")
+                    st.success(f"✅ {len(df_selezionati_completo)} strumenti rientrati!")
                     st.cache_data.clear()
                     time.sleep(1)
                     st.rerun()
                 else:
-                    st.warning("Seleziona almeno uno strumento.")
+                    st.warning("Spunta almeno uno strumento.")
 
 elif modulo == "📊 Situazione Attuale":
     st.markdown("### 📦 Inventario e Giacenze")
@@ -340,15 +365,15 @@ elif modulo == "🏗️ Cantieri e Bolle":
                 with col1:
                     st.download_button("🖨️ Stampa Bolla", data=genera_bolla_html(cant, df_kit_edit, filtro), file_name=f"Bolla_{cant}.html", mime="text/html", type="primary")
                 with col2:
-                    if st.button("🗑️ Elimina intera Bolla dallo Storico", type="secondary"):
+                    if st.button("🗑️ Elimina intera Bolla", type="secondary"):
                         df_st_pulito = df_st[~maschera]
                         with pd.ExcelWriter(FILE_STORICO, engine="openpyxl", mode="w") as w:
                             df_st_pulito.to_excel(w, index=False)
-                        st.success("✅ Bolla eliminata definitivamente!")
+                        st.success("✅ Bolla eliminata!")
                         time.sleep(1)
                         st.rerun()
             else:
-                st.info("Nessuna movimentazione trovata per questa selezione.")
+                st.info("Nessuna movimentazione trovata.")
 
 elif modulo == "📜 Storico Movimenti":
     st.markdown("### 📜 Movimentazioni (Cancella Riga o Modifica)")
