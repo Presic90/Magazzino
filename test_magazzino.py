@@ -141,24 +141,71 @@ def ottieni_logo_base64(path_immagine):
 def genera_bolla_html(cantiere, df_kit, tipo_bolla="USCITA"):
     righe = ""
     for _, row in df_kit.iterrows():
-        righe += f"<tr><td>{row['CODICE RFID']}</td><td>{row['Strumento']}</td><td>{row['Modello']}</td><td></td></tr>"
-    data_oggi = datetime.datetime.now().strftime("%d/%m/%Y")
-    titolo_doc = "DISTINTA USCITA MATERIALI" if tipo_bolla == "USCITA" else "DISTINTA RIENTRO MATERIALI"
+        righe += f"<tr><td style='font-family: monospace;'>{row['CODICE RFID']}</td><td>{row['Strumento']}</td><td>{row['Modello']}</td><td></td></tr>"
+    
+    data_oggi = datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
+    titolo_doc = "DISTINTA DI CONSEGNA MATERIALI" if tipo_bolla == "USCITA" else "DISTINTA DI RIENTRO MATERIALI"
     colore_tema = "#0A2540" if tipo_bolla == "USCITA" else "#1A4D2E" 
+    
     logo_b64 = ottieni_logo_base64(NOME_LOGO)
     estensione = "jpeg" if "jpg" in NOME_LOGO.lower() else "png"
     tag_logo = f'<img src="data:image/{estensione};base64,{logo_b64}" class="logo">' if logo_b64 else ""
     
     html = f"""
+    <!DOCTYPE html>
     <html>
-    <head><meta charset="utf-8"><title>Bolla_{tipo_bolla}_{cantiere}</title>
-    <style>body {{ font-family: Arial, sans-serif; margin: 40px; }} table {{ width: 100%; border-collapse: collapse; }} th, td {{ border: 1px solid #ddd; padding: 12px; }}</style>
+    <head>
+        <meta charset="utf-8">
+        <title>Bolla_{tipo_bolla}_{cantiere}</title>
+        <style>
+            body {{ font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; margin: 40px; color: #333; }}
+            .logo {{ max-height: 80px; margin-bottom: 10px; }}
+            .header-container {{ display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 3px solid {colore_tema}; padding-bottom: 15px; margin-bottom: 30px; }}
+            .doc-title {{ margin: 0; font-size: 26px; color: {colore_tema}; text-transform: uppercase; letter-spacing: 1px; }}
+            .doc-subtitle {{ margin: 5px 0 0 0; font-size: 18px; color: #555; }}
+            .doc-meta {{ text-align: right; font-size: 14px; line-height: 1.5; }}
+            table {{ width: 100%; border-collapse: collapse; margin-bottom: 40px; font-size: 13px; }}
+            th, td {{ border: 1px solid #dcdcdc; padding: 12px 15px; text-align: left; }}
+            th {{ background-color: #f8f9fa; color: {colore_tema}; font-weight: bold; text-transform: uppercase; font-size: 12px; }}
+            tr:nth-child(even) {{ background-color: #fcfcfc; }}
+            .signatures {{ display: flex; justify-content: space-between; margin-top: 60px; }}
+            .sig-box {{ width: 45%; border-top: 1px solid #000; padding-top: 8px; text-align: center; font-size: 14px; font-weight: bold; }}
+            @media print {{
+                body {{ margin: 0; padding: 20px; }}
+                .header-container {{ border-bottom: 2px solid #000; }}
+                th {{ background-color: #eee !important; color: #000 !important; -webkit-print-color-adjust: exact; }}
+            }}
+        </style>
     </head>
     <body onload="window.print()">
-        {tag_logo}
-        <h1 style="color:{colore_tema}">{titolo_doc} - Cantiere: {cantiere.upper()}</h1>
-        <table><thead><tr><th>Codice RFID</th><th>Strumento</th><th>Modello</th><th>Note</th></tr></thead><tbody>{righe}</tbody></table>
-    </body></html>
+        <div class="header-container">
+            <div>
+                {tag_logo}
+                <h1 class="doc-title">{titolo_doc}</h1>
+                <h2 class="doc-subtitle">Cantiere / Assegnatario: <strong>{cantiere.upper()}</strong></h2>
+            </div>
+            <div class="doc-meta">
+                <div><strong>Data Generazione:</strong> {data_oggi}</div>
+                <div><strong>Totale Strumenti:</strong> {len(df_kit)}</div>
+            </div>
+        </div>
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 25%;">Codice RFID</th>
+                    <th style="width: 35%;">Strumento</th>
+                    <th style="width: 25%;">Modello / Tipologia</th>
+                    <th style="width: 15%;">Note / Stato</th>
+                </tr>
+            </thead>
+            <tbody>{righe}</tbody>
+        </table>
+        <div class="signatures">
+            <div class="sig-box">Firma Operatore / Ricevente</div>
+            <div class="sig-box">Firma Responsabile Magazzino</div>
+        </div>
+    </body>
+    </html>
     """
     return html
 
